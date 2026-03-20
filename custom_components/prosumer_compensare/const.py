@@ -1,8 +1,6 @@
 """Constants for Prosumer Compensare integration."""
 
 DOMAIN = "prosumer_compensare"
-STORAGE_KEY = "prosumer_compensare_baselines"
-STORAGE_VERSION = 1
 
 # Config flow keys - sensor entities
 CONF_TOTAL_IMPORT = "total_energy_import"
@@ -18,11 +16,11 @@ CONF_PRET_IMPORT = "pret_import"
 CONF_PRET_EXPORT = "pret_export"
 CONF_RAPORT = "raport_compensare"
 
+# Config flow keys - dates
+CONF_DATA_INSTALARE = "data_instalare"
+CONF_DATA_CICLU = "data_ciclu"
+
 # Defaults
 DEFAULT_PRET_IMPORT = 1.16
 DEFAULT_PRET_EXPORT = 0.464
 DEFAULT_RAPORT = 2.5
-
-# Compensation cycle starts March 1
-CYCLE_START_MONTH = 3
-CYCLE_START_DAY = 1

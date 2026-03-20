@@ -3,33 +3,35 @@
     "step": {
       "user": {
         "title": "Select Energy Sensors",
-        "description": "Select the energy sensors from your inverter integration. Total Import and Total Export are required.",
+        "description": "Select the energy sensors from your inverter. Total Import and Total Export are required.",
         "data": {
           "total_energy_import": "Total Energy Import (kWh)",
           "total_energy_export": "Total Energy Export (kWh)",
-          "today_energy_import": "Today Energy Import (kWh, optional)",
-          "today_energy_export": "Today Energy Export (kWh, optional)",
+          "today_energy_import": "Today Energy Import (optional)",
+          "today_energy_export": "Today Energy Export (optional)",
           "grid_power": "Grid Power (W, optional)",
           "pv_power": "PV Power (W, optional)",
           "battery_soc": "Battery SOC (%, optional)"
         }
       },
       "prices": {
-        "title": "Prices & Compensation Ratio",
-        "description": "Configure your electricity prices and the compensation ratio from your energy provider.",
+        "title": "Prices, Ratio & Dates",
+        "description": "Set prices, compensation ratio, and the dates for tracking periods.",
         "data": {
           "pret_import": "Import price (RON/kWh)",
           "pret_export": "Export price (RON/kWh)",
-          "raport_compensare": "Compensation ratio (e.g. 2.5 = export 2.5 kWh to get 1 kWh free)"
+          "raport_compensare": "Compensation ratio (e.g. 2.5 = 2.5 kWh exported = 1 kWh free)",
+          "data_ciclu": "Cycle start date (e.g. March 1 for annual compensation)",
+          "data_instalare": "System install date (optional, for total tracking)"
         }
       }
     },
     "error": {
       "missing_required": "Total Import and Total Export sensors are required.",
-      "entity_not_found": "Entity not found. Please check the entity ID."
+      "entity_not_found": "Entity not found."
     },
     "abort": {
-      "already_configured": "This sensor is already configured."
+      "already_configured": "Already configured."
     }
   },
   "options": {
@@ -39,29 +41,31 @@
         "description": "What would you like to configure?",
         "menu_options": {
           "sensors": "Change energy sensors",
-          "prices": "Change prices & ratio"
+          "prices": "Change prices, ratio & dates"
         }
       },
       "sensors": {
         "title": "Edit Energy Sensors",
-        "description": "Change which sensors are used for tracking. Total Import and Total Export are required.",
+        "description": "Change which sensors are used.",
         "data": {
           "total_energy_import": "Total Energy Import (kWh)",
           "total_energy_export": "Total Energy Export (kWh)",
-          "today_energy_import": "Today Energy Import (kWh, optional)",
-          "today_energy_export": "Today Energy Export (kWh, optional)",
+          "today_energy_import": "Today Energy Import (optional)",
+          "today_energy_export": "Today Energy Export (optional)",
           "grid_power": "Grid Power (W, optional)",
           "pv_power": "PV Power (W, optional)",
           "battery_soc": "Battery SOC (%, optional)"
         }
       },
       "prices": {
-        "title": "Edit Prices & Ratio",
-        "description": "Update your electricity prices and compensation ratio.",
+        "title": "Edit Prices, Ratio & Dates",
+        "description": "Update prices, compensation ratio, and tracking dates.",
         "data": {
           "pret_import": "Import price (RON/kWh)",
           "pret_export": "Export price (RON/kWh)",
-          "raport_compensare": "Compensation ratio"
+          "raport_compensare": "Compensation ratio",
+          "data_ciclu": "Cycle start date",
+          "data_instalare": "System install date (optional)"
         }
       }
     }

@@ -3,33 +3,35 @@
     "step": {
       "user": {
         "title": "Selecteaza Senzorii de Energie",
-        "description": "Selecteaza senzorii de energie din integrarea inverterului tau. Total Import si Total Export sunt obligatorii.",
+        "description": "Selecteaza senzorii de energie din integrarea inverterului. Total Import si Total Export sunt obligatorii.",
         "data": {
           "total_energy_import": "Total Energie Importata (kWh)",
           "total_energy_export": "Total Energie Exportata (kWh)",
-          "today_energy_import": "Import Azi (kWh, optional)",
-          "today_energy_export": "Export Azi (kWh, optional)",
+          "today_energy_import": "Import Azi (optional)",
+          "today_energy_export": "Export Azi (optional)",
           "grid_power": "Putere Grid (W, optional)",
           "pv_power": "Putere PV (W, optional)",
           "battery_soc": "Baterie SOC (%, optional)"
         }
       },
       "prices": {
-        "title": "Preturi si Raport Compensare",
-        "description": "Configureaza preturile energiei si raportul de compensare de la furnizor.",
+        "title": "Preturi, Raport si Date",
+        "description": "Configureaza preturile, raportul de compensare si datele pentru perioade.",
         "data": {
           "pret_import": "Pret import (RON/kWh)",
           "pret_export": "Pret export (RON/kWh)",
-          "raport_compensare": "Raport compensare (ex: 2.5 = exporti 2.5 kWh pentru 1 kWh gratuit)"
+          "raport_compensare": "Raport compensare (ex: 2.5 = exporti 2.5 kWh pentru 1 kWh gratuit)",
+          "data_ciclu": "Data start ciclu (ex: 1 Martie pentru compensare anuala)",
+          "data_instalare": "Data instalare sistem (optional, pentru tracking total)"
         }
       }
     },
     "error": {
       "missing_required": "Senzorii Total Import si Total Export sunt obligatorii.",
-      "entity_not_found": "Entitatea nu a fost gasita. Verifica entity ID-ul."
+      "entity_not_found": "Entitatea nu a fost gasita."
     },
     "abort": {
-      "already_configured": "Acest senzor este deja configurat."
+      "already_configured": "Deja configurat."
     }
   },
   "options": {
@@ -39,29 +41,31 @@
         "description": "Ce doresti sa configurezi?",
         "menu_options": {
           "sensors": "Modifica senzorii de energie",
-          "prices": "Modifica preturile si raportul"
+          "prices": "Modifica preturi, raport si date"
         }
       },
       "sensors": {
-        "title": "Modifica Senzorii de Energie",
-        "description": "Schimba senzorii folositi pentru tracking. Total Import si Total Export sunt obligatorii.",
+        "title": "Modifica Senzorii",
+        "description": "Schimba senzorii folositi.",
         "data": {
           "total_energy_import": "Total Energie Importata (kWh)",
           "total_energy_export": "Total Energie Exportata (kWh)",
-          "today_energy_import": "Import Azi (kWh, optional)",
-          "today_energy_export": "Export Azi (kWh, optional)",
+          "today_energy_import": "Import Azi (optional)",
+          "today_energy_export": "Export Azi (optional)",
           "grid_power": "Putere Grid (W, optional)",
           "pv_power": "Putere PV (W, optional)",
           "battery_soc": "Baterie SOC (%, optional)"
         }
       },
       "prices": {
-        "title": "Modifica Preturile",
-        "description": "Actualizeaza preturile energiei si raportul de compensare.",
+        "title": "Modifica Preturi si Date",
+        "description": "Actualizeaza preturile, raportul si datele de tracking.",
         "data": {
           "pret_import": "Pret import (RON/kWh)",
           "pret_export": "Pret export (RON/kWh)",
-          "raport_compensare": "Raport compensare"
+          "raport_compensare": "Raport compensare",
+          "data_ciclu": "Data start ciclu",
+          "data_instalare": "Data instalare sistem (optional)"
         }
       }
     }

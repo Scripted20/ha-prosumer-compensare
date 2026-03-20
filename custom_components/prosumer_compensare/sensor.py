@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import logging
-from datetime import date, datetime, timezone
+from datetime import datetime, timezone, timedelta
 from typing import Any
 
 from homeassistant.components.recorder.statistics import (
@@ -17,10 +17,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import UnitOfEnergy
 from homeassistant.core import HomeAssistant, Event, callback
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from homeassistant.helpers.event import (
-    async_track_state_change_event,
-    async_track_time_interval,
-)
+from homeassistant.helpers.event import async_track_state_change_event
 
 from .const import (
     DOMAIN,
@@ -32,43 +29,33 @@ from .const import (
     CONF_PRET_IMPORT,
     CONF_PRET_EXPORT,
     CONF_RAPORT,
+    CONF_DATA_INSTALARE,
+    CONF_DATA_CICLU,
     DEFAULT_PRET_IMPORT,
     DEFAULT_PRET_EXPORT,
     DEFAULT_RAPORT,
-    CYCLE_START_MONTH,
-    CYCLE_START_DAY,
 )
 
 _LOGGER = logging.getLogger(__name__)
 
 
-async def _get_march_baseline(
-    hass: HomeAssistant, entity_id: str
+async def _get_baseline_at_date(
+    hass: HomeAssistant, entity_id: str, date_str: str
 ) -> float | None:
-    """Get the sensor value at midnight on March 1 of current cycle from recorder."""
-    today = date.today()
-
-    # Determine cycle start: if we're before March, use last year's March
-    if today.month < CYCLE_START_MONTH:
-        cycle_year = today.year - 1
-    else:
-        cycle_year = today.year
-
-    march_1 = datetime(
-        cycle_year, CYCLE_START_MONTH, CYCLE_START_DAY,
-        0, 0, 0, tzinfo=timezone.utc
-    )
-    march_1_end = datetime(
-        cycle_year, CYCLE_START_MONTH, CYCLE_START_DAY,
-        23, 59, 59, tzinfo=timezone.utc
-    )
+    """Get the sensor value at a specific date from recorder statistics."""
+    if not date_str:
+        return None
 
     try:
+        dt = datetime.fromisoformat(date_str)
+        start = datetime(dt.year, dt.month, dt.day, 0, 0, 0, tzinfo=timezone.utc)
+        end = start + timedelta(hours=23, minutes=59, seconds=59)
+
         stats = await hass.async_add_executor_job(
             statistics_during_period,
             hass,
-            march_1,
-            march_1_end,
+            start,
+            end,
             {entity_id},
             "hour",
             None,
@@ -80,7 +67,8 @@ async def _get_march_baseline(
             return entity_stats[0].get("state")
     except Exception:
         _LOGGER.warning(
-            "Could not read March 1 baseline for %s from recorder", entity_id
+            "Could not read baseline at %s for %s from recorder",
+            date_str, entity_id
         )
 
     return None
@@ -94,29 +82,54 @@ async def async_setup_entry(
     """Set up Prosumer Compensare sensors from a config entry."""
     config = hass.data[DOMAIN][entry.entry_id]
 
-    # Read March 1 baselines from HA recorder (no manual storage needed)
-    baseline_import = await _get_march_baseline(
-        hass, config[CONF_TOTAL_IMPORT]
+    # Read baselines from recorder for both dates
+    data_ciclu = config.get(CONF_DATA_CICLU)
+    data_instalare = config.get(CONF_DATA_INSTALARE)
+
+    ciclu_import = await _get_baseline_at_date(
+        hass, config[CONF_TOTAL_IMPORT], data_ciclu
     )
-    baseline_export = await _get_march_baseline(
-        hass, config[CONF_TOTAL_EXPORT]
+    ciclu_export = await _get_baseline_at_date(
+        hass, config[CONF_TOTAL_EXPORT], data_ciclu
     )
 
+    instalare_import = None
+    instalare_export = None
+    if data_instalare:
+        instalare_import = await _get_baseline_at_date(
+            hass, config[CONF_TOTAL_IMPORT], data_instalare
+        )
+        instalare_export = await _get_baseline_at_date(
+            hass, config[CONF_TOTAL_EXPORT], data_instalare
+        )
+
     _LOGGER.info(
-        "Prosumer baselines from recorder — import: %s, export: %s",
-        baseline_import, baseline_export,
+        "Prosumer baselines — ciclu(%s): imp=%s exp=%s | instalare(%s): imp=%s exp=%s",
+        data_ciclu, ciclu_import, ciclu_export,
+        data_instalare, instalare_import, instalare_export,
     )
 
     baselines = {
-        "import": baseline_import,
-        "export": baseline_export,
+        "ciclu_import": ciclu_import,
+        "ciclu_export": ciclu_export,
+        "instalare_import": instalare_import,
+        "instalare_export": instalare_export,
     }
 
     entities: list[SensorEntity] = [
-        ProsumerCreditKwhSensor(hass, entry, config, baselines),
-        ProsumerCreditRonSensor(hass, entry, config, baselines),
-        ProsumerProcentCompensareSensor(hass, entry, config, baselines),
+        # Ciclu sensors (from selected cycle date)
+        ProsumerCreditKwhSensor(hass, entry, config, baselines, "ciclu"),
+        ProsumerCreditRonSensor(hass, entry, config, baselines, "ciclu"),
+        ProsumerProcentCompensareSensor(hass, entry, config, baselines, "ciclu"),
     ]
+
+    # Total sensors (from install date) — only if install date is set
+    if data_instalare:
+        entities.extend([
+            ProsumerCreditKwhSensor(hass, entry, config, baselines, "total"),
+            ProsumerCreditRonSensor(hass, entry, config, baselines, "total"),
+            ProsumerProcentCompensareSensor(hass, entry, config, baselines, "total"),
+        ])
 
     if config.get(CONF_TODAY_IMPORT) and config.get(CONF_TODAY_EXPORT):
         entities.append(ProsumerBalantaAziSensor(hass, entry, config))
@@ -139,7 +152,6 @@ class ProsumerBaseSensor(SensorEntity):
         config: dict,
         baselines: dict | None = None,
     ) -> None:
-        """Initialize."""
         self.hass = hass
         self._entry = entry
         self._config = config
@@ -180,29 +192,39 @@ class ProsumerBaseSensor(SensorEntity):
         except (ValueError, TypeError):
             return 0.0
 
-    def _get_since_march(self, entity_id: str, baseline_key: str) -> float:
-        """Get value accumulated since March 1 using recorder baseline."""
+    def _get_since(self, entity_id: str, baseline_key: str) -> float:
+        """Get value accumulated since a baseline date."""
         current = self._get_float(entity_id)
         baseline = self._baselines.get(baseline_key)
-
         if baseline is None:
-            # No recorder data for March 1 — can't calculate
             return 0.0
-
         return max(0.0, current - baseline)
 
 
 class ProsumerCreditKwhSensor(ProsumerBaseSensor):
-    """Sensor showing free kWh credit available."""
+    """Sensor showing free kWh credit — for ciclu or total period."""
 
-    _attr_name = "Credit Gratuit"
     _attr_native_unit_of_measurement = UnitOfEnergy.KILO_WATT_HOUR
     _attr_device_class = SensorDeviceClass.ENERGY
     _attr_state_class = SensorStateClass.MEASUREMENT
 
-    def __init__(self, hass, entry, config, baselines):
+    def __init__(self, hass, entry, config, baselines, period: str):
         super().__init__(hass, entry, config, baselines)
-        self._attr_unique_id = f"{entry.entry_id}_credit_kwh"
+        self._period = period
+        if period == "total":
+            self._attr_name = "Credit Total"
+            self._attr_unique_id = f"{entry.entry_id}_credit_total_kwh"
+        else:
+            self._attr_name = "Credit Ciclu"
+            self._attr_unique_id = f"{entry.entry_id}_credit_ciclu_kwh"
+
+    @property
+    def _import_key(self) -> str:
+        return f"{self._period}_import"
+
+    @property
+    def _export_key(self) -> str:
+        return f"{self._period}_export"
 
     async def async_added_to_hass(self) -> None:
         await super().async_added_to_hass()
@@ -221,8 +243,8 @@ class ProsumerCreditKwhSensor(ProsumerBaseSensor):
         self.async_write_ha_state()
 
     def _update_value(self) -> None:
-        exported = self._get_since_march(self._config[CONF_TOTAL_EXPORT], "export")
-        imported = self._get_since_march(self._config[CONF_TOTAL_IMPORT], "import")
+        exported = self._get_since(self._config[CONF_TOTAL_EXPORT], self._export_key)
+        imported = self._get_since(self._config[CONF_TOTAL_IMPORT], self._import_key)
         raport = self._get_raport()
         credit = (exported / raport) - imported if raport > 0 else 0
         self._attr_native_value = round(credit, 1)
@@ -233,16 +255,17 @@ class ProsumerCreditKwhSensor(ProsumerBaseSensor):
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
-        exported = self._get_since_march(self._config[CONF_TOTAL_EXPORT], "export")
-        imported = self._get_since_march(self._config[CONF_TOTAL_IMPORT], "import")
+        exported = self._get_since(self._config[CONF_TOTAL_EXPORT], self._export_key)
+        imported = self._get_since(self._config[CONF_TOTAL_IMPORT], self._import_key)
         raport = self._get_raport()
+        date_key = CONF_DATA_INSTALARE if self._period == "total" else CONF_DATA_CICLU
         return {
-            "exported_din_martie": round(exported, 1),
-            "imported_din_martie": round(imported, 1),
+            "perioada": self._period,
+            "data_start": self._config.get(date_key, "N/A"),
+            "exportat": round(exported, 1),
+            "importat": round(imported, 1),
             "echivalent_gratuit": round(exported / raport, 1) if raport > 0 else 0,
             "raport": raport,
-            "baseline_export": self._baselines.get("export"),
-            "baseline_import": self._baselines.get("import"),
             "status": self._get_status(),
         }
 
@@ -258,16 +281,29 @@ class ProsumerCreditKwhSensor(ProsumerBaseSensor):
 
 
 class ProsumerCreditRonSensor(ProsumerBaseSensor):
-    """Sensor showing monetary balance in RON."""
+    """Sensor showing monetary balance in RON — for ciclu or total."""
 
-    _attr_name = "Credit Gratuit RON"
     _attr_native_unit_of_measurement = "RON"
     _attr_icon = "mdi:cash-multiple"
     _attr_state_class = SensorStateClass.MEASUREMENT
 
-    def __init__(self, hass, entry, config, baselines):
+    def __init__(self, hass, entry, config, baselines, period: str):
         super().__init__(hass, entry, config, baselines)
-        self._attr_unique_id = f"{entry.entry_id}_credit_ron"
+        self._period = period
+        if period == "total":
+            self._attr_name = "Credit Total RON"
+            self._attr_unique_id = f"{entry.entry_id}_credit_total_ron"
+        else:
+            self._attr_name = "Credit Ciclu RON"
+            self._attr_unique_id = f"{entry.entry_id}_credit_ciclu_ron"
+
+    @property
+    def _import_key(self) -> str:
+        return f"{self._period}_import"
+
+    @property
+    def _export_key(self) -> str:
+        return f"{self._period}_export"
 
     async def async_added_to_hass(self) -> None:
         await super().async_added_to_hass()
@@ -286,23 +322,36 @@ class ProsumerCreditRonSensor(ProsumerBaseSensor):
         self.async_write_ha_state()
 
     def _update_value(self) -> None:
-        exported = self._get_since_march(self._config[CONF_TOTAL_EXPORT], "export")
-        imported = self._get_since_march(self._config[CONF_TOTAL_IMPORT], "import")
+        exported = self._get_since(self._config[CONF_TOTAL_EXPORT], self._export_key)
+        imported = self._get_since(self._config[CONF_TOTAL_IMPORT], self._import_key)
         balance = (exported * self._get_pret_export()) - (imported * self._get_pret_import())
         self._attr_native_value = round(balance, 2)
 
 
 class ProsumerProcentCompensareSensor(ProsumerBaseSensor):
-    """Sensor showing what % of import is covered by export."""
+    """Sensor showing what % of import is covered — for ciclu or total."""
 
-    _attr_name = "Procent Compensare"
     _attr_native_unit_of_measurement = "%"
     _attr_icon = "mdi:percent"
     _attr_state_class = SensorStateClass.MEASUREMENT
 
-    def __init__(self, hass, entry, config, baselines):
+    def __init__(self, hass, entry, config, baselines, period: str):
         super().__init__(hass, entry, config, baselines)
-        self._attr_unique_id = f"{entry.entry_id}_procent"
+        self._period = period
+        if period == "total":
+            self._attr_name = "Compensare Total"
+            self._attr_unique_id = f"{entry.entry_id}_procent_total"
+        else:
+            self._attr_name = "Compensare Ciclu"
+            self._attr_unique_id = f"{entry.entry_id}_procent_ciclu"
+
+    @property
+    def _import_key(self) -> str:
+        return f"{self._period}_import"
+
+    @property
+    def _export_key(self) -> str:
+        return f"{self._period}_export"
 
     async def async_added_to_hass(self) -> None:
         await super().async_added_to_hass()
@@ -321,8 +370,8 @@ class ProsumerProcentCompensareSensor(ProsumerBaseSensor):
         self.async_write_ha_state()
 
     def _update_value(self) -> None:
-        exported = self._get_since_march(self._config[CONF_TOTAL_EXPORT], "export")
-        imported = self._get_since_march(self._config[CONF_TOTAL_IMPORT], "import")
+        exported = self._get_since(self._config[CONF_TOTAL_EXPORT], self._export_key)
+        imported = self._get_since(self._config[CONF_TOTAL_IMPORT], self._import_key)
         raport = self._get_raport()
         credit_kwh = exported / raport if raport > 0 else 0
 
@@ -348,16 +397,14 @@ class ProsumerBalantaAziSensor(ProsumerBaseSensor):
 
     async def async_added_to_hass(self) -> None:
         await super().async_added_to_hass()
-        entities_to_track = [
-            e for e in [
-                self._config.get(CONF_TODAY_IMPORT),
-                self._config.get(CONF_TODAY_EXPORT),
-            ] if e
-        ]
-        if entities_to_track:
+        entities = [e for e in [
+            self._config.get(CONF_TODAY_IMPORT),
+            self._config.get(CONF_TODAY_EXPORT),
+        ] if e]
+        if entities:
             self.async_on_remove(
                 async_track_state_change_event(
-                    self.hass, entities_to_track, self._handle_update
+                    self.hass, entities, self._handle_update
                 )
             )
         self._update_value()
@@ -371,8 +418,9 @@ class ProsumerBalantaAziSensor(ProsumerBaseSensor):
         exported = self._get_float(self._config.get(CONF_TODAY_EXPORT))
         imported = self._get_float(self._config.get(CONF_TODAY_IMPORT))
         raport = self._get_raport()
-        balance = (exported / raport) - imported if raport > 0 else 0
-        self._attr_native_value = round(balance, 2)
+        self._attr_native_value = round(
+            (exported / raport) - imported if raport > 0 else 0, 2
+        )
 
 
 class GridDirectieSensor(ProsumerBaseSensor):
@@ -387,11 +435,11 @@ class GridDirectieSensor(ProsumerBaseSensor):
 
     async def async_added_to_hass(self) -> None:
         await super().async_added_to_hass()
-        grid_entity = self._config.get(CONF_GRID_POWER)
-        if grid_entity:
+        grid = self._config.get(CONF_GRID_POWER)
+        if grid:
             self.async_on_remove(
                 async_track_state_change_event(
-                    self.hass, [grid_entity], self._handle_update
+                    self.hass, [grid], self._handle_update
                 )
             )
         self._update_value()
