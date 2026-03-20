@@ -1,0 +1,215 @@
+###############################################################################
+#
+#  PROSUMER COMPENSARE - Dashboard YAML
+#
+#  CERINTE:
+#    - HACS Frontend: Mushroom Cards
+#    - HACS Frontend: ApexCharts Card
+#
+#  INSTALARE:
+#    Settings → Dashboards → Add Dashboard → Edit → ⋮ → Raw Configuration Editor
+#    Paste tot continutul de mai jos → Save
+#
+#  CONFIGURARE:
+#    Inlocuieste cu Find & Replace (Ctrl+H):
+#
+#    sensor.YOUR_TOTAL_ENERGY_EXPORT   →  senzorul tau total export (kWh)
+#    sensor.YOUR_TOTAL_ENERGY_IMPORT   →  senzorul tau total import (kWh)
+#    sensor.YOUR_TODAY_ENERGY_EXPORT   →  senzorul tau export azi (kWh)
+#    sensor.YOUR_TODAY_ENERGY_IMPORT   →  senzorul tau import azi (kWh)
+#    sensor.YOUR_GRID_POWER            →  senzorul tau putere grid (W)
+#    sensor.YOUR_PV_POWER              →  senzorul tau putere PV (W)
+#    sensor.YOUR_BATTERY_SOC           →  senzorul tau baterie (%)
+#
+###############################################################################
+
+views:
+  - title: Compensare Energie
+    path: prosumer
+    icon: mdi:solar-power
+    cards:
+      # === GAUGE PRINCIPAL ===
+      - type: gauge
+        entity: sensor.prosumer_credit_gratuit_kwh
+        name: Credit Energie Gratuita
+        unit: kWh
+        needle: true
+        min: -500
+        max: 500
+        severity:
+          green: 50
+          yellow: -50
+          red: -500
+
+      # === REZUMAT COMPENSARE ===
+      - type: horizontal-stack
+        cards:
+          - type: custom:mushroom-entity-card
+            entity: sensor.prosumer_export_anual
+            name: Exportat din Martie
+            icon: mdi:transmission-tower-export
+            icon_color: green
+            layout: vertical
+          - type: custom:mushroom-template-card
+            primary: Echivalent Gratuit
+            secondary: >-
+              {{ (states('sensor.prosumer_export_anual') | float(0) /
+              states('input_number.raport_compensare') | float(2.5)) | round(1)
+              }} kWh
+            icon: mdi:gift
+            icon_color: teal
+            layout: vertical
+          - type: custom:mushroom-entity-card
+            entity: sensor.prosumer_import_anual
+            name: Importat din Martie
+            icon: mdi:transmission-tower-import
+            icon_color: red
+            layout: vertical
+
+      - type: horizontal-stack
+        cards:
+          - type: custom:mushroom-entity-card
+            entity: sensor.prosumer_credit_gratuit_ron
+            name: Balanta RON
+            icon: mdi:cash-multiple
+            icon_color: green
+            layout: vertical
+          - type: custom:mushroom-entity-card
+            entity: sensor.prosumer_procent_compensare
+            name: Compensare
+            icon: mdi:percent-circle
+            icon_color: amber
+            layout: vertical
+          - type: custom:mushroom-entity-card
+            entity: input_number.raport_compensare
+            name: Raport Export:Import
+            icon: mdi:scale-balance
+            icon_color: blue
+            layout: vertical
+
+      # === BALANTA AZI ===
+      - type: horizontal-stack
+        cards:
+          - type: custom:mushroom-entity-card
+            entity: sensor.YOUR_TODAY_ENERGY_EXPORT
+            name: Export Azi
+            icon: mdi:solar-power
+            icon_color: green
+          - type: custom:mushroom-entity-card
+            entity: sensor.YOUR_TODAY_ENERGY_IMPORT
+            name: Import Azi
+            icon: mdi:flash
+            icon_color: red
+          - type: custom:mushroom-entity-card
+            entity: sensor.prosumer_balanta_azi_kwh
+            name: Balanta Azi
+            icon: mdi:scale-balance
+            icon_color: teal
+
+      # === BALANTA LUNA ===
+      - type: horizontal-stack
+        cards:
+          - type: custom:mushroom-entity-card
+            entity: sensor.prosumer_export_lunar
+            name: Export Lunar
+            icon: mdi:solar-power
+            icon_color: green
+          - type: custom:mushroom-entity-card
+            entity: sensor.prosumer_import_lunar
+            name: Import Lunar
+            icon: mdi:flash
+            icon_color: red
+          - type: custom:mushroom-entity-card
+            entity: sensor.prosumer_balanta_luna_kwh
+            name: Balanta Luna
+            icon: mdi:calendar-month
+            icon_color: teal
+
+      # === STARE LIVE ===
+      - type: horizontal-stack
+        cards:
+          - type: custom:mushroom-entity-card
+            entity: sensor.grid_directie_acum
+            name: Grid Acum
+            icon_color: amber
+          - type: custom:mushroom-entity-card
+            entity: sensor.YOUR_PV_POWER
+            name: Productie PV
+            icon: mdi:solar-panel-large
+            icon_color: amber
+          - type: custom:mushroom-entity-card
+            entity: sensor.YOUR_BATTERY_SOC
+            name: Baterie
+            icon: mdi:battery
+            icon_color: green
+
+      # === GRAFIC IMPORT vs EXPORT (30 zile) ===
+      - type: custom:apexcharts-card
+        header:
+          title: Import vs Export - Ultimele 30 zile
+          show: true
+          show_states: true
+          colorize_states: true
+        graph_span: 30d
+        span:
+          end: day
+        apex_config:
+          chart:
+            height: 300px
+          legend:
+            show: true
+            position: top
+        series:
+          - entity: sensor.YOUR_TOTAL_ENERGY_EXPORT
+            name: Export (kWh)
+            type: column
+            color: "#22c55e"
+            group_by:
+              func: delta
+              duration: 1d
+            show:
+              legend_value: true
+              in_header: raw
+          - entity: sensor.YOUR_TOTAL_ENERGY_IMPORT
+            name: Import (kWh)
+            type: column
+            color: "#ef4444"
+            group_by:
+              func: delta
+              duration: 1d
+            show:
+              legend_value: true
+              in_header: raw
+
+      # === SETARI PRETURI ===
+      - type: entities
+        title: Setari Preturi
+        entities:
+          - entity: input_number.pret_import_kwh
+            name: Pret Import (RON/kWh)
+            icon: mdi:cash-minus
+          - entity: input_number.pret_export_kwh
+            name: Pret Export (RON/kWh)
+            icon: mdi:cash-plus
+          - entity: input_number.raport_compensare
+            name: Raport compensare
+            icon: mdi:scale-balance
+
+      # === EXPLICATIE ===
+      - type: markdown
+        content: >
+          ### Cum functioneaza compensarea?
+
+          - Exporti **{{ states('input_number.raport_compensare') }} kWh** in
+          retea → primesti **1 kWh gratuit**
+
+          - Pret export: **{{ states('input_number.pret_export_kwh') }}
+          RON/kWh**
+
+          - Pret import: **{{ states('input_number.pret_import_kwh') }}
+          RON/kWh**
+
+          **De la 1 Martie:** Exportat **{{
+          states('sensor.prosumer_export_anual') }} kWh** | Importat **{{
+          states('sensor.prosumer_import_anual') }} kWh** | Credit **{{
+          states('sensor.prosumer_credit_gratuit_kwh') }} kWh**
