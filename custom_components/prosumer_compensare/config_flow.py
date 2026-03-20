@@ -11,6 +11,9 @@ from homeassistant.helpers.selector import (
     NumberSelector,
     NumberSelectorConfig,
     NumberSelectorMode,
+    SelectSelector,
+    SelectSelectorConfig,
+    SelectSelectorMode,
 )
 
 from .const import (
@@ -30,6 +33,71 @@ from .const import (
     DEFAULT_RAPORT,
 )
 
+SENSOR_SELECTOR = EntitySelector(EntitySelectorConfig(domain="sensor"))
+
+
+def _sensor_schema(defaults: dict | None = None) -> vol.Schema:
+    """Build sensor selection schema with optional defaults."""
+    d = defaults or {}
+    schema = {}
+
+    if CONF_TOTAL_IMPORT in d:
+        schema[vol.Required(CONF_TOTAL_IMPORT, default=d[CONF_TOTAL_IMPORT])] = SENSOR_SELECTOR
+    else:
+        schema[vol.Required(CONF_TOTAL_IMPORT)] = SENSOR_SELECTOR
+
+    if CONF_TOTAL_EXPORT in d:
+        schema[vol.Required(CONF_TOTAL_EXPORT, default=d[CONF_TOTAL_EXPORT])] = SENSOR_SELECTOR
+    else:
+        schema[vol.Required(CONF_TOTAL_EXPORT)] = SENSOR_SELECTOR
+
+    for key in (CONF_TODAY_IMPORT, CONF_TODAY_EXPORT, CONF_GRID_POWER, CONF_PV_POWER, CONF_BATTERY_SOC):
+        if key in d and d[key]:
+            schema[vol.Optional(key, default=d[key])] = SENSOR_SELECTOR
+        else:
+            schema[vol.Optional(key)] = SENSOR_SELECTOR
+
+    return vol.Schema(schema)
+
+
+def _prices_schema(defaults: dict | None = None) -> vol.Schema:
+    """Build prices schema with optional defaults."""
+    d = defaults or {}
+    return vol.Schema(
+        {
+            vol.Required(
+                CONF_PRET_IMPORT,
+                default=d.get(CONF_PRET_IMPORT, DEFAULT_PRET_IMPORT),
+            ): NumberSelector(
+                NumberSelectorConfig(
+                    min=0.1, max=5.0, step=0.001,
+                    unit_of_measurement="RON/kWh",
+                    mode=NumberSelectorMode.BOX,
+                )
+            ),
+            vol.Required(
+                CONF_PRET_EXPORT,
+                default=d.get(CONF_PRET_EXPORT, DEFAULT_PRET_EXPORT),
+            ): NumberSelector(
+                NumberSelectorConfig(
+                    min=0.1, max=3.0, step=0.001,
+                    unit_of_measurement="RON/kWh",
+                    mode=NumberSelectorMode.BOX,
+                )
+            ),
+            vol.Required(
+                CONF_RAPORT,
+                default=d.get(CONF_RAPORT, DEFAULT_RAPORT),
+            ): NumberSelector(
+                NumberSelectorConfig(
+                    min=1.0, max=5.0, step=0.1,
+                    unit_of_measurement="x",
+                    mode=NumberSelectorMode.BOX,
+                )
+            ),
+        }
+    )
+
 
 class ProsumerCompensareConfigFlow(ConfigFlow, domain=DOMAIN):
     """Handle a config flow for Prosumer Compensare."""
@@ -45,7 +113,6 @@ class ProsumerCompensareConfigFlow(ConfigFlow, domain=DOMAIN):
         errors = {}
 
         if user_input is not None:
-            # Validate that required sensors exist
             total_import = user_input.get(CONF_TOTAL_IMPORT)
             total_export = user_input.get(CONF_TOTAL_EXPORT)
 
@@ -63,33 +130,17 @@ class ProsumerCompensareConfigFlow(ConfigFlow, domain=DOMAIN):
                     self._sensor_data = user_input
                     return await self.async_step_prices()
 
-        sensor_selector = EntitySelector(
-            EntitySelectorConfig(domain="sensor")
-        )
-
         return self.async_show_form(
             step_id="user",
-            data_schema=vol.Schema(
-                {
-                    vol.Required(CONF_TOTAL_IMPORT): sensor_selector,
-                    vol.Required(CONF_TOTAL_EXPORT): sensor_selector,
-                    vol.Optional(CONF_TODAY_IMPORT): sensor_selector,
-                    vol.Optional(CONF_TODAY_EXPORT): sensor_selector,
-                    vol.Optional(CONF_GRID_POWER): sensor_selector,
-                    vol.Optional(CONF_PV_POWER): sensor_selector,
-                    vol.Optional(CONF_BATTERY_SOC): sensor_selector,
-                }
-            ),
+            data_schema=_sensor_schema(),
             errors=errors,
         )
 
     async def async_step_prices(self, user_input=None):
         """Step 2: Configure prices and compensation ratio."""
         if user_input is not None:
-            # Merge sensor data with price data
             data = {**self._sensor_data, **user_input}
 
-            # Set unique ID based on the import sensor to prevent duplicates
             await self.async_set_unique_id(
                 f"prosumer_{self._sensor_data[CONF_TOTAL_IMPORT]}"
             )
@@ -102,43 +153,7 @@ class ProsumerCompensareConfigFlow(ConfigFlow, domain=DOMAIN):
 
         return self.async_show_form(
             step_id="prices",
-            data_schema=vol.Schema(
-                {
-                    vol.Required(
-                        CONF_PRET_IMPORT, default=DEFAULT_PRET_IMPORT
-                    ): NumberSelector(
-                        NumberSelectorConfig(
-                            min=0.1,
-                            max=5.0,
-                            step=0.001,
-                            unit_of_measurement="RON/kWh",
-                            mode=NumberSelectorMode.BOX,
-                        )
-                    ),
-                    vol.Required(
-                        CONF_PRET_EXPORT, default=DEFAULT_PRET_EXPORT
-                    ): NumberSelector(
-                        NumberSelectorConfig(
-                            min=0.1,
-                            max=3.0,
-                            step=0.001,
-                            unit_of_measurement="RON/kWh",
-                            mode=NumberSelectorMode.BOX,
-                        )
-                    ),
-                    vol.Required(
-                        CONF_RAPORT, default=DEFAULT_RAPORT
-                    ): NumberSelector(
-                        NumberSelectorConfig(
-                            min=1.0,
-                            max=5.0,
-                            step=0.1,
-                            unit_of_measurement="x",
-                            mode=NumberSelectorMode.BOX,
-                        )
-                    ),
-                }
-            ),
+            data_schema=_prices_schema(),
         )
 
     @staticmethod
@@ -149,59 +164,47 @@ class ProsumerCompensareConfigFlow(ConfigFlow, domain=DOMAIN):
 
 
 class ProsumerCompensareOptionsFlow(OptionsFlow):
-    """Handle options flow for Prosumer Compensare."""
+    """Handle options flow — menu with sensors and prices editing."""
 
     def __init__(self, config_entry: ConfigEntry) -> None:
         """Initialize options flow."""
         self._config_entry = config_entry
 
     async def async_step_init(self, user_input=None):
-        """Manage the options."""
-        if user_input is not None:
-            return self.async_create_entry(title="", data=user_input)
+        """Show menu: edit sensors or edit prices."""
+        return self.async_show_menu(
+            step_id="init",
+            menu_options=["sensors", "prices"],
+        )
 
-        current = self._config_entry.data
+    async def async_step_sensors(self, user_input=None):
+        """Edit sensor entities."""
+        if user_input is not None:
+            # Merge with existing data — keep prices, update sensors
+            new_data = dict(self._config_entry.data)
+            new_data.update(user_input)
+            self.hass.config_entries.async_update_entry(
+                self._config_entry, data=new_data
+            )
+            return self.async_create_entry(title="", data={})
 
         return self.async_show_form(
-            step_id="init",
-            data_schema=vol.Schema(
-                {
-                    vol.Required(
-                        CONF_PRET_IMPORT,
-                        default=current.get(CONF_PRET_IMPORT, DEFAULT_PRET_IMPORT),
-                    ): NumberSelector(
-                        NumberSelectorConfig(
-                            min=0.1,
-                            max=5.0,
-                            step=0.001,
-                            unit_of_measurement="RON/kWh",
-                            mode=NumberSelectorMode.BOX,
-                        )
-                    ),
-                    vol.Required(
-                        CONF_PRET_EXPORT,
-                        default=current.get(CONF_PRET_EXPORT, DEFAULT_PRET_EXPORT),
-                    ): NumberSelector(
-                        NumberSelectorConfig(
-                            min=0.1,
-                            max=3.0,
-                            step=0.001,
-                            unit_of_measurement="RON/kWh",
-                            mode=NumberSelectorMode.BOX,
-                        )
-                    ),
-                    vol.Required(
-                        CONF_RAPORT,
-                        default=current.get(CONF_RAPORT, DEFAULT_RAPORT),
-                    ): NumberSelector(
-                        NumberSelectorConfig(
-                            min=1.0,
-                            max=5.0,
-                            step=0.1,
-                            unit_of_measurement="x",
-                            mode=NumberSelectorMode.BOX,
-                        )
-                    ),
-                }
-            ),
+            step_id="sensors",
+            data_schema=_sensor_schema(dict(self._config_entry.data)),
+        )
+
+    async def async_step_prices(self, user_input=None):
+        """Edit prices and ratio."""
+        if user_input is not None:
+            # Merge with existing data — keep sensors, update prices
+            new_data = dict(self._config_entry.data)
+            new_data.update(user_input)
+            self.hass.config_entries.async_update_entry(
+                self._config_entry, data=new_data
+            )
+            return self.async_create_entry(title="", data={})
+
+        return self.async_show_form(
+            step_id="prices",
+            data_schema=_prices_schema(dict(self._config_entry.data)),
         )

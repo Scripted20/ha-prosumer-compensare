@@ -36,7 +36,28 @@
     "step": {
       "init": {
         "title": "Setari Prosumer Compensare",
-        "description": "Modifica preturile si raportul de compensare.",
+        "description": "Ce doresti sa configurezi?",
+        "menu_options": {
+          "sensors": "Modifica senzorii de energie",
+          "prices": "Modifica preturile si raportul"
+        }
+      },
+      "sensors": {
+        "title": "Modifica Senzorii de Energie",
+        "description": "Schimba senzorii folositi pentru tracking. Total Import si Total Export sunt obligatorii.",
+        "data": {
+          "total_energy_import": "Total Energie Importata (kWh)",
+          "total_energy_export": "Total Energie Exportata (kWh)",
+          "today_energy_import": "Import Azi (kWh, optional)",
+          "today_energy_export": "Export Azi (kWh, optional)",
+          "grid_power": "Putere Grid (W, optional)",
+          "pv_power": "Putere PV (W, optional)",
+          "battery_soc": "Baterie SOC (%, optional)"
+        }
+      },
+      "prices": {
+        "title": "Modifica Preturile",
+        "description": "Actualizeaza preturile energiei si raportul de compensare.",
         "data": {
           "pret_import": "Pret import (RON/kWh)",
           "pret_export": "Pret export (RON/kWh)",

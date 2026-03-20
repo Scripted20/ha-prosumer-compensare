@@ -36,7 +36,28 @@
     "step": {
       "init": {
         "title": "Prosumer Compensare Settings",
-        "description": "Update prices and compensation ratio.",
+        "description": "What would you like to configure?",
+        "menu_options": {
+          "sensors": "Change energy sensors",
+          "prices": "Change prices & ratio"
+        }
+      },
+      "sensors": {
+        "title": "Edit Energy Sensors",
+        "description": "Change which sensors are used for tracking. Total Import and Total Export are required.",
+        "data": {
+          "total_energy_import": "Total Energy Import (kWh)",
+          "total_energy_export": "Total Energy Export (kWh)",
+          "today_energy_import": "Today Energy Import (kWh, optional)",
+          "today_energy_export": "Today Energy Export (kWh, optional)",
+          "grid_power": "Grid Power (W, optional)",
+          "pv_power": "PV Power (W, optional)",
+          "battery_soc": "Battery SOC (%, optional)"
+        }
+      },
+      "prices": {
+        "title": "Edit Prices & Ratio",
+        "description": "Update your electricity prices and compensation ratio.",
         "data": {
           "pret_import": "Import price (RON/kWh)",
           "pret_export": "Export price (RON/kWh)",
