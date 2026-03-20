@@ -1,0 +1,7 @@
+{
+  "name": "Prosumer Compensare Romania",
+  "homeassistant": "2024.1.0",
+  "render_readme": true,
+  "country": ["RO"],
+  "iot_class": "calculated"
+}

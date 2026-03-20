@@ -1,0 +1,11 @@
+{
+  "domain": "prosumer_compensare",
+  "name": "Prosumer Compensare Romania",
+  "codeowners": ["@Scripted20"],
+  "config_flow": true,
+  "documentation": "https://github.com/Scripted20/ha-prosumer-compensare",
+  "integration_type": "service",
+  "iot_class": "calculated",
+  "issue_tracker": "https://github.com/Scripted20/ha-prosumer-compensare/issues",
+  "version": "1.0.0"
+}

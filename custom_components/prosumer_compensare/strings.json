@@ -1,0 +1,48 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Select Energy Sensors",
+        "description": "Select the energy sensors from your inverter integration. Total Import and Total Export are required.",
+        "data": {
+          "total_energy_import": "Total Energy Import (kWh)",
+          "total_energy_export": "Total Energy Export (kWh)",
+          "today_energy_import": "Today Energy Import (kWh, optional)",
+          "today_energy_export": "Today Energy Export (kWh, optional)",
+          "grid_power": "Grid Power (W, optional)",
+          "pv_power": "PV Power (W, optional)",
+          "battery_soc": "Battery SOC (%, optional)"
+        }
+      },
+      "prices": {
+        "title": "Prices & Compensation Ratio",
+        "description": "Configure your electricity prices and the compensation ratio from your energy provider.",
+        "data": {
+          "pret_import": "Import price (RON/kWh)",
+          "pret_export": "Export price (RON/kWh)",
+          "raport_compensare": "Compensation ratio (e.g. 2.5 = export 2.5 kWh to get 1 kWh free)"
+        }
+      }
+    },
+    "error": {
+      "missing_required": "Total Import and Total Export sensors are required.",
+      "entity_not_found": "Entity not found. Please check the entity ID."
+    },
+    "abort": {
+      "already_configured": "This sensor is already configured."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Prosumer Compensare Settings",
+        "description": "Update prices and compensation ratio.",
+        "data": {
+          "pret_import": "Import price (RON/kWh)",
+          "pret_export": "Export price (RON/kWh)",
+          "raport_compensare": "Compensation ratio"
+        }
+      }
+    }
+  }
+}

@@ -1,6 +1,8 @@
-# Prosumer Compensare - Home Assistant
+# Prosumer Compensare Romania - Home Assistant
 
-Dashboard Home Assistant pentru prosumeri din Romania cu sistem solar. Calculeaza automat cati kWh poti importa gratuit din retea pe baza energiei exportate, folosind raportul de compensare al furnizorului (ex: Hidroelectrica).
+[![hacs_badge](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://github.com/hacs/integration)
+
+Integrare Home Assistant pentru prosumeri din Romania cu sistem solar. Calculeaza automat cati kWh poti importa gratuit din retea pe baza energiei exportate, folosind raportul de compensare al furnizorului (ex: Hidroelectrica).
 
 ## Cum functioneaza
 
@@ -10,112 +12,91 @@ In Romania, prosumerii (cei care au panouri solare si vand energie in retea) pri
 - **Raport**: pentru fiecare 2.5 kWh exportati, primesti 1 kWh gratuit
 - **Ciclul** de compensare: Martie → Februarie (an urmator)
 
-Acest proiect iti arata in timp real:
-- Cati **kWh poti importa gratuit** (credit acumulat)
+Integrarea iti arata in timp real:
+- Cati **kWh poti importa gratuit** (credit acumulat din Martie)
 - **Balanta in RON** (valoare export vs cost import)
 - **Procent compensare** (cat % din import e acoperit)
-- Grafic **import vs export** pe ultimele 30 zile
-- Balanta **zilnica** si **lunara**
+- **Balanta zilnica** (azi cat ai castigat/pierdut)
+- **Directia grid** (importi sau exporti acum)
+
+## Instalare prin HACS
+
+### Pasul 1: Adauga repository-ul in HACS
+
+1. Deschide **HACS** in Home Assistant
+2. Click pe **⋮** (meniu) din dreapta sus → **Custom repositories**
+3. Adauga URL: `https://github.com/Scripted20/ha-prosumer-compensare`
+4. Categoria: **Integration**
+5. Click **Add**
+
+### Pasul 2: Instaleaza integrarea
+
+1. In HACS, cauta **"Prosumer Compensare"**
+2. Click **Download**
+3. **Restart Home Assistant**
+
+### Pasul 3: Configureaza
+
+1. Mergi la **Settings → Devices & Services → Add Integration**
+2. Cauta **"Prosumer Compensare"**
+3. **Pasul 1**: Selecteaza senzorii de energie din dropdown-uri:
+   - Total Energie Importata (obligatoriu)
+   - Total Energie Exportata (obligatoriu)
+   - Import Azi, Export Azi, Putere Grid, Putere PV, Baterie (optional)
+4. **Pasul 2**: Seteaza preturile:
+   - Pret import (RON/kWh) — implicit 1.16
+   - Pret export (RON/kWh) — implicit 0.464
+   - Raport compensare — implicit 2.5
+
+### Pasul 4: Dashboard (optional)
+
+1. **Settings → Dashboards → Add Dashboard** (from scratch)
+2. Numeste-l "Prosumer" → Create
+3. Deschide → **creionul** (edit) → **⋮** → **Raw Configuration Editor**
+4. Paste continutul din `dashboard/prosumer_dashboard.yaml`
+5. Inlocuieste placeholder-urile `sensor.YOUR_*` cu senzorii tai
+6. **Save**
+
+**Cerinte dashboard:** Mushroom Cards + ApexCharts Card (instalabile din HACS → Frontend)
+
+## Modificare preturi ulterior
+
+Dupa instalare, poti modifica preturile oricand:
+**Settings → Devices & Services → Prosumer Compensare → Configure**
 
 ## Cerinte
 
 - **Home Assistant** 2024.1+
 - **HACS** instalat
-- **Mushroom Cards** (HACS → Frontend)
-- **ApexCharts Card** (HACS → Frontend)
 - Un **inverter solar** integrat in HA (Deye, Huawei, Fronius, SolarEdge, etc.)
-
-## Instalare
-
-### Pasul 1: Activeaza packages in HA
-
-Adauga in `configuration.yaml` (daca nu exista deja):
-
-```yaml
-homeassistant:
-  packages: !include_dir_named packages
-```
-
-Creaza folderul `/config/packages/` daca nu exista.
-
-### Pasul 2: Copiaza package-ul
-
-Copiaza fisierul `packages/prosumer_compensare.yaml` in `/config/packages/`.
-
-### Pasul 3: Configureaza entity ID-urile
-
-Deschide `prosumer_compensare.yaml` si inlocuieste placeholders cu entity ID-urile tale.
-
-Foloseste **Find & Replace** (Ctrl+H):
-
-| Placeholder | Ce sa pui | Exemplu (Deye 10KW) |
-|---|---|---|
-| `sensor.YOUR_TOTAL_ENERGY_IMPORT` | Senzor total energie importata (kWh, total_increasing) | `sensor.inverter_deye_10kw_total_energy_import` |
-| `sensor.YOUR_TOTAL_ENERGY_EXPORT` | Senzor total energie exportata (kWh, total_increasing) | `sensor.inverter_deye_10kw_total_energy_export` |
-| `sensor.YOUR_TODAY_ENERGY_IMPORT` | Senzor import azi (kWh) | `sensor.inverter_deye_10kw_today_energy_import` |
-| `sensor.YOUR_TODAY_ENERGY_EXPORT` | Senzor export azi (kWh) | `sensor.inverter_deye_10kw_today_energy_export` |
-| `sensor.YOUR_GRID_POWER` | Putere grid in timp real (W) | `sensor.inverter_deye_10kw_grid_power` |
-| `sensor.YOUR_PV_POWER` | Putere panouri solare (W) | `sensor.inverter_deye_10kw_pv_power` |
-| `sensor.YOUR_BATTERY_SOC` | Nivel baterie (%) | `sensor.inverter_deye_10kw_battery` |
-
-**Cum gasesti entity ID-urile:**
-1. Mergi la **Developer Tools → States**
-2. Cauta `total_energy_import` sau `grid_power`
-3. Copiaza `entity_id`-ul complet
-
-### Pasul 4: Restart Home Assistant
-
-**Settings → System → Restart**
-
-### Pasul 5: Adauga dashboard-ul
-
-1. **Settings → Dashboards → Add Dashboard** (from scratch)
-2. Numeste-l "Prosumer" → Create
-3. Deschide dashboard-ul → click **creionul** (edit) → **⋮** → **Raw Configuration Editor**
-4. Sterge tot si paste continutul din `dashboard/prosumer_dashboard.yaml`
-5. **Atentie:** Fa acelasi Find & Replace si in dashboard YAML (aceleasi 7 placeholders)
-6. **Save**
-
-### Pasul 6: Configureaza preturile
-
-Dupa restart, mergi la dashboard-ul Prosumer si modifica:
-- **Pret Import** (cat platesti pe kWh cand cumperi din retea)
-- **Pret Export** (cat primesti pe kWh cand vinzi in retea)
-- **Raport compensare** (cati kWh exportati = 1 kWh gratuit, de obicei 2.5)
 
 ## Invertere testate
 
 | Inverter | Integrare HA | Status |
 |---|---|---|
 | Deye 10KW (hybrid, trifazat) | Solarman | Testat |
-| Huawei SUN2000 | Huawei Solar | Ar trebui sa mearga |
-| Fronius | Fronius Integration | Ar trebui sa mearga |
-| SolarEdge | SolarEdge Modbus | Ar trebui sa mearga |
+| Huawei SUN2000 | Huawei Solar | Netestat |
+| Fronius | Fronius Integration | Netestat |
+| SolarEdge | SolarEdge Modbus | Netestat |
 
 Daca l-ai testat cu alt inverter, deschide un Issue sau PR.
 
-## Structura fisiere
-
-```
-packages/
-  prosumer_compensare.yaml    ← Package HA (senzori + utility meters)
-dashboard/
-  prosumer_dashboard.yaml     ← Dashboard YAML (copy-paste in HA)
-```
-
 ## Senzori creati
-
-Dupa instalare, vei avea acesti senzori noi:
 
 | Senzor | Ce arata |
 |---|---|
-| `sensor.prosumer_credit_gratuit_kwh` | Cati kWh poti importa gratuit |
-| `sensor.prosumer_credit_gratuit_ron` | Balanta in RON |
-| `sensor.prosumer_balanta_azi_kwh` | Balanta zilei curente |
-| `sensor.prosumer_balanta_luna_kwh` | Balanta lunii curente |
-| `sensor.prosumer_procent_compensare` | Cat % din import e acoperit |
-| `sensor.grid_directie_acum` | Import/Export/Echilibru in timp real |
+| Credit Gratuit | Cati kWh poti importa gratuit (din Martie) |
+| Credit Gratuit RON | Balanta in RON |
+| Balanta Azi | Credit/debit azi |
+| Procent Compensare | Cat % din import e acoperit de export |
+| Grid Directie | Import/Export/Echilibru in timp real |
+
+## Cum functioneaza tehnic
+
+- Senzorii asculta schimbarile de stare ale senzorilor sursa (fara polling)
+- Valorile "din Martie" sunt calculate folosind baseline-uri persistate (se reseteaza automat pe 1 Martie)
+- Preturile se pot modifica din UI fara restart
 
 ## Licenta
 
-MIT - foloseste-l liber.
+MIT
