@@ -40,6 +40,81 @@ SENSOR_SELECTOR = EntitySelector(EntitySelectorConfig(domain="sensor"))
 DATE_SELECTOR = DateSelector(DateSelectorConfig())
 
 
+async def _detect_from_energy(hass) -> dict:
+    """Auto-detect sensors and prices from HA Energy configuration."""
+    detected = {}
+
+    try:
+        prefs = await hass.async_add_executor_job(
+            lambda: hass.data.get("energy_manager")
+        )
+        if prefs is None:
+            # Try WebSocket approach
+            prefs_data = await hass.services.async_call(
+                "energy", "get_prefs", blocking=True
+            )
+    except Exception:
+        pass
+
+    # Use websocket to get energy prefs
+    try:
+        from homeassistant.components.energy import async_get_manager
+        manager = await async_get_manager(hass)
+        prefs_data = manager.data
+    except Exception:
+        return detected
+
+    if not prefs_data:
+        return detected
+
+    sources = prefs_data.get("energy_sources", [])
+
+    for source in sources:
+        if source.get("type") == "grid":
+            # Import (flow_from)
+            flow_from = source.get("flow_from", [])
+            if flow_from:
+                today_import = flow_from[0].get("stat_energy_from", "")
+                detected[CONF_TODAY_IMPORT] = today_import
+                # Try to find the total variant
+                total_import = today_import.replace("today_", "total_")
+                if hass.states.get(total_import):
+                    detected[CONF_TOTAL_IMPORT] = total_import
+                # Get price
+                price = flow_from[0].get("number_energy_price")
+                if price:
+                    detected[CONF_PRET_IMPORT] = price
+
+            # Export (flow_to)
+            flow_to = source.get("flow_to", [])
+            if flow_to:
+                today_export = flow_to[0].get("stat_energy_to", "")
+                detected[CONF_TODAY_EXPORT] = today_export
+                total_export = today_export.replace("today_", "total_")
+                if hass.states.get(total_export):
+                    detected[CONF_TOTAL_EXPORT] = total_export
+                price = flow_to[0].get("number_energy_price")
+                if price:
+                    detected[CONF_PRET_EXPORT] = price
+
+        elif source.get("type") == "solar":
+            solar_entity = source.get("stat_energy_from", "")
+            # Derive PV power and grid power from the entity prefix
+            prefix = solar_entity.rsplit("_today_", 1)[0] if "_today_" in solar_entity else ""
+            if prefix:
+                pv = f"{prefix}_pv_power"
+                if hass.states.get(pv):
+                    detected[CONF_PV_POWER] = pv
+                grid = f"{prefix}_grid_power"
+                if hass.states.get(grid):
+                    detected[CONF_GRID_POWER] = grid
+                battery = f"{prefix}_battery"
+                if hass.states.get(battery):
+                    detected[CONF_BATTERY_SOC] = battery
+
+    return detected
+
+
 def _sensor_schema(defaults: dict | None = None) -> vol.Schema:
     """Build sensor selection schema with optional defaults."""
     d = defaults or {}
@@ -63,8 +138,6 @@ def _sensor_schema(defaults: dict | None = None) -> vol.Schema:
 def _prices_schema(defaults: dict | None = None) -> vol.Schema:
     """Build prices + dates schema."""
     d = defaults or {}
-
-    # Default cycle date: March 1 of current year
     today = date.today()
     default_ciclu = d.get(CONF_DATA_CICLU, f"{today.year}-03-01")
     default_instalare = d.get(CONF_DATA_INSTALARE, "")
@@ -121,10 +194,15 @@ class ProsumerCompensareConfigFlow(ConfigFlow, domain=DOMAIN):
 
     def __init__(self) -> None:
         self._sensor_data: dict = {}
+        self._detected: dict = {}
 
     async def async_step_user(self, user_input=None):
-        """Step 1: Select energy sensor entities."""
+        """Step 1: Select energy sensor entities (pre-filled from Energy config)."""
         errors = {}
+
+        # Auto-detect on first load
+        if not self._detected:
+            self._detected = await _detect_from_energy(self.hass)
 
         if user_input is not None:
             total_import = user_input.get(CONF_TOTAL_IMPORT)
@@ -133,12 +211,9 @@ class ProsumerCompensareConfigFlow(ConfigFlow, domain=DOMAIN):
             if not total_import or not total_export:
                 errors["base"] = "missing_required"
             else:
-                state_import = self.hass.states.get(total_import)
-                state_export = self.hass.states.get(total_export)
-
-                if state_import is None:
+                if self.hass.states.get(total_import) is None:
                     errors[CONF_TOTAL_IMPORT] = "entity_not_found"
-                elif state_export is None:
+                elif self.hass.states.get(total_export) is None:
                     errors[CONF_TOTAL_EXPORT] = "entity_not_found"
                 else:
                     self._sensor_data = user_input
@@ -146,7 +221,7 @@ class ProsumerCompensareConfigFlow(ConfigFlow, domain=DOMAIN):
 
         return self.async_show_form(
             step_id="user",
-            data_schema=_sensor_schema(),
+            data_schema=_sensor_schema(self._detected),
             errors=errors,
         )
 
@@ -165,9 +240,11 @@ class ProsumerCompensareConfigFlow(ConfigFlow, domain=DOMAIN):
                 data=data,
             )
 
+        # Merge detected prices into defaults
+        defaults = dict(self._detected)
         return self.async_show_form(
             step_id="prices",
-            data_schema=_prices_schema(),
+            data_schema=_prices_schema(defaults),
         )
 
     @staticmethod
@@ -177,7 +254,7 @@ class ProsumerCompensareConfigFlow(ConfigFlow, domain=DOMAIN):
 
 
 class ProsumerCompensareOptionsFlow(OptionsFlow):
-    """Handle options flow — menu with sensors, prices, and dates editing."""
+    """Handle options flow — menu with sensors, prices, and dates."""
 
     def __init__(self, config_entry: ConfigEntry) -> None:
         self._config_entry = config_entry
